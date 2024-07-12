@@ -1,0 +1,74 @@
+stages:
+  - build
+  - style
+  - test
+  - deploy
+
+build-job:
+  stage: build
+  tags:
+    - build
+  script:
+    - echo "Building the project..."
+    - cd src/cat && make s21_cat && cd ./../grep && make s21_grep
+  artifacts:
+    paths:
+      - src/cat/s21_cat
+      - src/grep/s21_grep
+    expire_in: 30 days
+  after_script:
+    - ./telegram/telegram.sh
+  only:
+    - develop
+
+style-job:
+  stage: style
+  tags:
+    - style
+  script:
+    - cd src/
+    - bash style_test.sh
+  after_script:
+    - ./telegram/telegram.sh
+
+test-job:
+  stage: test
+  tags:
+    - test
+  script:
+    - echo "Testing"
+    - |
+      cd src/cat
+      make test | tee tests_result.log
+      if grep -q "FAILED: 0" tests_result.log; then
+        echo "cat_test_passed"
+      else
+        echo "cat_test_failed"
+        exit 1
+      fi
+    - |
+      cd ../grep
+      make test | tee tests_result.log
+      if grep -q "FAIL: 0" tests_result.log; then
+        echo "test_grep_passed"
+      else
+        echo "test_grep_failed"
+        exit 1
+      fi
+  after_script:
+    - ./telegram/telegram.sh
+  only:
+    - develop
+
+deploy-job:
+  stage: deploy
+  tags:
+    - deploy
+  when: manual
+  script:
+    - cd src/
+    - bash deployment.sh
+  after_script:
+    - ./telegram/telegram.sh
+  only:
+    - develop
